@@ -1,24 +1,26 @@
 
+#include <stdbool.h>
+#include <wchar.h>
+#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 
 #define MAX_LINE 500 /* Characters */
 
 /**
  * @brief Get line from stdin
  * @param[out] buf Pointer to line buffer
- * @param[in] buf_sz The max size of the buffer
- * @return Written bytes to the buffer
+ * @param[in] buf_sz The max size of the buffer (number of elements, not bytes)
+ * @return Written (wide) characters to the buffer
  */
-int get_line(char* buf, size_t buf_sz) {
+int wgetline(wchar_t* buf, size_t buf_sz) {
     size_t written = 0;
-    int c          = 0;
+    wint_t c       = 0;
 
     while (c != '\n') {
-        c = getchar();
+        c = getwc(stdin);
 
-        if (c == EOF || written >= buf_sz) {
+        if (c == WEOF || written >= buf_sz) {
             *buf = '\0';
             return EOF; /* We are done */
         }
@@ -36,11 +38,8 @@ int get_line(char* buf, size_t buf_sz) {
  * @brief Returns the normalized version of a character
  * @param[in] ch Character to be normalized
  * @return Normalized and lowercase character
- *
- * @todo Use getwchar() instead of getchar()
- * https://www.ibm.com/docs/en/i/7.1?topic=functions-getwchar-get-wide-character-from-stdin
  */
-int normalized(int ch) {
+wchar_t normalized(wchar_t ch) {
     switch (ch) {
         case 225: /* 'á' */
         case 224: /* 'à' */
@@ -149,6 +148,8 @@ int normalized(int ch) {
  * @param argc Number of arguments
  * @param argv Vector of string arguments
  * @return Exit code
+ *
+ * @todo Read wide chars from parameters
  */
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -160,10 +161,12 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    size_t line_sz = MAX_LINE;
-    char* line     = calloc(line_sz, sizeof(char));
+    setlocale(LC_ALL, "");
 
-    for (int cur_line = 1; get_line(line, line_sz) != EOF; cur_line++) {
+    size_t line_sz = MAX_LINE;
+    wchar_t* line  = calloc(line_sz, sizeof(wchar_t));
+
+    for (int cur_line = 1; wgetline(line, line_sz) != EOF; cur_line++) {
         /* Starting position in the target line of the match and current
          * match position inside the arg string */
         int match_start = 0;
@@ -184,9 +187,6 @@ int main(int argc, char** argv) {
                 match_pos   = 0;
             }
 
-            /* TODO */
-            printf("%d:%c\n", line[line_p], line[line_p]);
-
             if (normalized(line[line_p]) == normalized(argv[1][match_pos])) {
                 /* First matched character, store */
                 if (match_pos == 0)
@@ -197,11 +197,8 @@ int main(int argc, char** argv) {
                 /* Last, check if the arg string is finished (after
                  * increasing match_pos) */
                 if (argv[1][match_pos] == '\0') {
-#ifdef DEBUG
-                    printf("Match found at line %d, pos: %d-%ld\n", cur_line,
-                           match_start, line_p);
-#endif
-                    printf("%d:%s", cur_line, line);
+                    printf("%d:%d-%ld:%ls", cur_line, match_start, line_p,
+                           line);
                 }
             }
         }
